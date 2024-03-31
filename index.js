@@ -9,6 +9,8 @@ const pubSubClient = new PubSub();
 const {v1} = require('@google-cloud/pubsub');
 const subClient = new v1.SubscriberClient();
 const User = require('./config').users;
+// const database = require('./userModel.js');
+
 
 const subscriptionName = 'verify_email-sub';
 // const subscription = pubSubClient.subscription(subscriptionName);
@@ -36,6 +38,12 @@ async function sendVerificationEmail(pubsubMessage) {
             text: `Click the link to verify your email address: ` + `http://tarunsankhla.me:3000/verifyaccount?token=${pubsubMessage}`,
         };
 
+        console.log("DB_name:",process.env.DB_NAME );
+        console.log("DB_USER:",process.env.DB_USER );
+        console.log("DB_PASSWORD:",process.env.DB_PASSWORD );
+        console.log("DB_HOST:",process.env.DB_HOST );
+        // await database.sequelize.authenticate();
+
         await User.update({
             verification_email_timestamp: new Date()
         }, {
@@ -52,7 +60,7 @@ async function sendVerificationEmail(pubsubMessage) {
         console.log("Verification email sent successfully.");
     } catch (error) {
         console.error("Error sending verification email:", error);
-        throw new Error("Failed to send verification email");
+        // throw new Error("Failed to send verification email");
     }
 }
 
