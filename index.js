@@ -1,50 +1,50 @@
 const dotenv = require('dotenv');
 dotenv.config();
-const { PubSub } = require('@google-cloud/pubsub');
-const { Pool } = require('pg');
-const mailgun = require("mailgun-js");
-const functions = require('@google-cloud/functions-framework');
-const base64 = require('base-64');
-const pubSubClient = new PubSub();
-const {v1} = require('@google-cloud/pubsub');
-const subClient = new v1.SubscriberClient();
 const User = require('./config').users;
-// const database = require('./userModel.js');
+const formData = require('form-data');
+const Mailgun = require('mailgun.js');
 
 
-const subscriptionName = 'verify_email-sub';
-// const subscription = pubSubClient.subscription(subscriptionName);
-
-const mailgunClient = mailgun({
-    apiKey: "1bced3227e7a983b058f73bf7aee74cb-309b0ef4-daed13f6",
-    domain: "mail.tarunsankhla.me"
+const mailgunFormData = new Mailgun(formData);
+const mailgunClient = mailgunFormData.client({
+  username: 'api',
+  key:  '1bced3227e7a983b058f73bf7aee74cb-309b0ef4-daed13f6',
 });
 
-async function sendVerificationEmail(pubsubMessage) {
-    try {
-        const messageData = JSON.parse(Buffer.from(pubsubMessage, 'base64').toString());
-        console.log("Sending verification email...");
-        console.log("messageData:", messageData);
+exports.processNewUserMessage = async (event, context) => {
+  console.log("trying");
+  try {
+    console.log("extracting message from pubsub");
+    const pubSubmessage = event.data
+      ? Buffer.from(event.data, 'base64').toString()
+      : '{}';
+    console.log("event.data:", event.data);
+    console.log("pubSubmessage:", pubSubmessage);
+    const payload = JSON.parse(pubSubmessage);
+    console.log("payload:", payload);
+    // const userEmailAddress = payload.username;
+    // const userId=payload.id;
+    const userId = payload.split(":")[0];
+    const email = payload.split(":")[1];
+    const verificationLink=`http://tarunsankhla.me:3000/verifyaccount?token=${event.data}`;
+    console.log(verificationLink);
 
-        const userId = messageData.split(":")[0];
-        const email = messageData.split(":")[1];
-        console.log("userId:", userId);
-        console.log("email:", email);
+    const mailOptions = {
+      from: 'tarunsankhla21@gmail.com',
+      to: [email],  
+      subject: 'Email Verification',
+      text: 'Please verify your email address.',
+      html: `<p>Verify your email address: <a href="${verificationLink}">link</a></p>`,
+    };
 
-        const data = {
-            from: "tarunsankhla21@gmail.com",
-            to: email,
-            subject: "Verify! Your Account at WebApp",
-            text: `Click the link to verify your email address: ` + `http://tarunsankhla.me:3000/verifyaccount?token=${pubsubMessage}`,
-        };
 
-        console.log("DB_name:",process.env.DB_NAME );
-        console.log("DB_USER:",process.env.DB_USER );
-        console.log("DB_PASSWORD:",process.env.DB_PASSWORD );
-        console.log("DB_HOST:",process.env.DB_HOST );
-        // await database.sequelize.authenticate();
-
-        await User.update({
+    const response = await mailgunClient.messages.create('mail.tarunsankhla.me', mailOptions);
+    console.log('Email Succefully sent:', response);
+    console.log('Email Succefully sent:', response);
+    if (response.id) {
+ 
+    //   const user = await User.findOne({ where: { username: userEmail } });
+      await User.update({
             verification_email_timestamp: new Date()
         }, {
             where: {
@@ -55,74 +55,10 @@ async function sendVerificationEmail(pubsubMessage) {
         }).catch((e) => {
             console.log("error:", e)
         });
-
-        await mailgunClient.messages().send(data);
-        console.log("Verification email sent successfully.");
-    } catch (error) {
-        console.error("Error sending verification email:", error);
-        // throw new Error("Failed to send verification email");
+    } else {
+      console.log('Email sending failed.');
     }
-}
-
-async function synchronousPull(projectId, subscriptionNameOrId) {
-
-    console.log(`projectId: ${projectId}`);
-    console.log(`subscriptionNameOrId: ${subscriptionNameOrId}`);
-    const formattedSubscription = subscriptionNameOrId.indexOf('/') >= 0
-        ? subscriptionNameOrId
-        : subClient.subscriptionPath(projectId, subscriptionNameOrId);
-
-    console.log(`\nStart pulling messages from ${formattedSubscription}.`);
-
-    const request = {
-        subscription: formattedSubscription,
-        maxMessages: 10,
-    };
-    console.log("request:", request);
-    const [response] = await subClient.pull(request);
-
-    console.log(`Received ${response.receivedMessages.length} messages.`);
-
-    const ackIds = [];
-    for (const message of response.receivedMessages || []) {
-        console.log(`Received message: ${message.message.data}`);
-        if (message.ackId) {
-            ackIds.push(message.ackId);
-        }
-    }
-
-    if (ackIds.length !== 0) {
-        const ackRequest = {
-            subscription: formattedSubscription,
-            ackIds: ackIds,
-        };
-        console.log("ackRequest:", ackRequest);
-        await subClient.acknowledge(ackRequest);
-    }
-
-    console.log('Done.');
-
-}
-
-functions.cloudEvent('processNewUserMessage', async (cloudEvent, context) => {
-    console.log(cloudEvent.data);
-    const pubsubMessage = cloudEvent.data.message.data;
-
-    (async () => {
-        await sendVerificationEmail(pubsubMessage);
-
-        console.log("Acknowledging the message...");
-        await synchronousPull("csye6225tarundev", "cloud_function_subscription");
-        console.log("Message acknowledged successfully.");
-        // console.log("context:", context);
-        // const pubsubMessageId = context.eventId;
-        // const pubsubTopic = context.resource.name;
-        // console.log("pubsubMessageId:", pubsubMessageId);
-        // console.log("pubsubTopic:", pubsubTopic);
-        // const subscriptionName = pubsubTopic.substring(pubsubTopic.lastIndexOf('/') + 1);
-        // console.log("subscriptionName:", subscriptionName);
-        // const subscription = pubSubClient.subscription(subscriptionName);
-        // console.log("subscription:", subscription);
-        // await subscription.ack(pubsubMessageId);
-    })();
-});
+  } catch (error) {
+    console.error('Failed to send email:', error);
+  }
+};
