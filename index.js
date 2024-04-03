@@ -26,7 +26,7 @@ exports.processNewUserMessage = async (event, context) => {
     // const userId=payload.id;
     const userId = payload.split(":")[0];
     const email = payload.split(":")[1];
-    const verificationLink=`http://tarunsankhla.me:3000/verifyaccount?id=${userId}`;
+    const verificationLink=`https://tarunsankhla.me/verifyaccount?id=${userId}`;
     console.log(verificationLink);
 
     const mailOptions = {
