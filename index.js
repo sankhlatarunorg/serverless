@@ -8,7 +8,7 @@ const Mailgun = require('mailgun.js');
 const mailgunFormData = new Mailgun(formData);
 const mailgunClient = mailgunFormData.client({
   username: 'api',
-  key:  '1bced3227e7a983b058f73bf7aee74cb-309b0ef4-daed13f6',
+  key:  `${process.env.MAILGUN_API_KEY}`,
 });
 
 exports.processNewUserMessage = async (event, context) => {
@@ -26,11 +26,11 @@ exports.processNewUserMessage = async (event, context) => {
     // const userId=payload.id;
     const userId = payload.split(":")[0];
     const email = payload.split(":")[1];
-    const verificationLink=`https://tarunsankhla.me/verifyaccount?id=${userId}`;
+    const verificationLink=`https://${process.env.EMAIL_DOMAIN}/verifyaccount?id=${userId}`;
     console.log(verificationLink);
 
     const mailOptions = {
-      from: 'tarunsankhla21@gmail.com',
+      from: process.env.SENDER_EMAIL,
       to: [email],  
       subject: 'Email Verification',
       text: 'Please verify your email address.',
@@ -38,7 +38,7 @@ exports.processNewUserMessage = async (event, context) => {
     };
 
 
-    const response = await mailgunClient.messages.create('mail.tarunsankhla.me', mailOptions);
+    const response = await mailgunClient.messages.create(process.env.DOMAIN, mailOptions);
     console.log('Email Succefully sent:', response);
     console.log('Email Succefully sent:', response);
     if (response.id) {
